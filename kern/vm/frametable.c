@@ -12,36 +12,47 @@
 
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 struct frame_table_entry {
-        size_t next_empty;
+        struct addrspace* a_space;
+        paddr_t physical_addr;
+        vaddr_t virtual_addr;
+        // size_t next_empty;
+        bool is_free; 
         //paddr vs manual calculation
 };
-struct frame_table_entry *frametable = 0;
-paddr_t free_addr;
-paddr_t first_addr;
-int total_frames
+struct frame_table_entry *frametable = NULL; //change to 0?
+paddr_t curr_free_addr;
+//paddr_t first_addr;
+int total_frames;
 
 void init_frametable(void)
 {
+        // might have to use lock!!!
         paddr_t ram_first = 0;
         paddr_t ram_size = ram_getsize();
         paddr_t temp;
         total_frames = (ram_size - ram_first)/PAGE_SIZE;
-        int frametable_size = total_frames * sizeof(struct frame_table_entry);
-        int entry_num = frametable_size/PAGE_SIZE;
+        int frametable_size = total_frames * sizeof(struct frame_table_entry); 
+       // int entry_num = frametable_size/PAGE_SIZE;
         frametable = (struct frame_table_entry*) PADDR_TO_KVADDR(ram_first);
-        free_addr = ram_first + frametable_size;
-        first_addr = ram_first;
+        curr_free_addr = ram_first + frametable_size;
+        curr_free_addr = curr_free_addr + (PAGE_SIZE - (curr_free_addr % PAGE_SIZE))
+        //first_addr = ram_first;
 
         //UNFINISHED
-        for(i = 0; i < total_frames; i++){
-                if(i < entry_num){
-                        frametable[i].next_empty = 0;
-                } else {
+        for(int i = 0; i < total_frames; i++){
+                frametable[i].is_free = true;
+                frametable[i].physical_addr = curr_free_addr + i * PAGE_SIZE;
+                frametable[i].virtual_addr = -1; //CHECK THIS
 
-                }
 
-                temp = (PAGE_SIZE * i) + first_addr;
-                frametable[i].next_empty = temp;
+                // if(i < entry_num){
+                //         frametable[i].next_empty = 0;
+                // } else {
+
+                // }
+
+                // temp = (PAGE_SIZE * i) + first_addr;
+                // frametable[i].next_empty = temp;
                 
         }
 
@@ -50,7 +61,7 @@ void init_frametable(void)
 paddr_t getppages(unsigned int npages){
         paddr_t nextaddr;
 
-        if(frametable == 0){
+        if(frametable == NULL){
                 spinlock_acquire(&stealmem_lock);
                 nextaddr = ram_stealmem(npages);
                 spinlock_release(&stealmem_lock);
@@ -58,11 +69,19 @@ paddr_t getppages(unsigned int npages){
                 if(npages > 1){
                         return 0;
                 }
-
-                //UNFINISHED
-
+                // maybe acquire a locker here !
+                int free_index = -1;
+                for(int i=0;i<total_frames;i++){
+                        free_index = i;
+                        if(frametable[i].is_free == False){
+                                break;
+                        }
+                }
+                frametable[i].is_free = false;
+                nextaddr = frametable[i].physical_addr;
+                // CHECK IF i > total_frames !?!?!
         }
-
+        bzero((void *)PADDR_TO_KVADDR(nextaddr),PAGE_SIZE);
         return nextaddr;
 }
 
@@ -85,6 +104,17 @@ vaddr_t alloc_kpages(unsigned int npages)
 
 void free_kpages(vaddr_t addr)
 {
+        bool is_done = false;
+
+        for(int i = 0; i < total_frames; i++){
+                if(is_done == true){
+                        return;
+                }
+                if(PADDR_TO_KVADDR(frametable[i].physical_addr)== addr){
+                        frametable[i].is_free = true;
+                        is_done = true;
+                }
+        }
         //struct issue
 }
 
