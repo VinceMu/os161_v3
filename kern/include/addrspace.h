@@ -40,6 +40,14 @@
 
 struct vnode;
 
+struct region {
+	vaddr_t vbase;
+	size_t npages;
+	int readable;
+	int writeable;
+	int executable;
+	struct region* next_region;
+};
 
 /*
  * Address space - data structure associated with the virtual memory
@@ -47,6 +55,7 @@ struct vnode;
  *
  * You write this.
  */
+
 
 struct addrspace {
 #if OPT_DUMBVM
@@ -59,8 +68,23 @@ struct addrspace {
         paddr_t as_stackpbase;
 #else
         /* Put stuff here for your VM system */
+        int n_regions;
+        struct region *region_head; //first region
+        struct addrspace *pid;
+        paddr_t as_stackpbase;
 #endif
 };
+
+struct page{
+        paddr_t frame_address;
+        vaddr_t page_address;
+        struct addrspace *pid;
+        struct page *next_page; 
+}
+
+void create_page_table(void);
+int insert_page(vaddr_t page_address);
+int lookup_page_table(vaddr_t lookup_address,struct addrspace *pid);
 
 /*
  * Functions in addrspace.c:

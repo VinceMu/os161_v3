@@ -6,14 +6,16 @@
 #include <vm.h>
 #include <machine/tlb.h>
 
+struct page *page_table = NULL; //swap to 0 if needed!
+int num_pages = 0;
 /* Place your page table functions here */
-
 
 void vm_bootstrap(void)
 {
         /* Initialise VM sub-system.  You probably want to initialise your 
            frame table here as well.
         */
+        init_frametable();
 }
 
 int

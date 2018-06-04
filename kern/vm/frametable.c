@@ -14,7 +14,7 @@ static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 struct frame_table_entry {
         struct addrspace* a_space;
         paddr_t physical_addr;
-        vaddr_t virtual_addr;
+        //vaddr_t virtual_addr;
         // size_t next_empty;
         bool is_free; 
         //paddr vs manual calculation
@@ -42,7 +42,7 @@ void init_frametable(void)
         for(int i = 0; i < total_frames; i++){
                 frametable[i].is_free = true;
                 frametable[i].physical_addr = curr_free_addr + i * PAGE_SIZE;
-                frametable[i].virtual_addr = -1; //CHECK THIS
+                //frametable[i].virtual_addr = -1; //CHECK THIS
 
 
                 // if(i < entry_num){
