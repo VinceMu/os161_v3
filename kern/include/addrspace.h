@@ -33,6 +33,7 @@
 /*
  * Address space structure and operations.
  */
+#define PAGE_BITS  12
 
 
 #include <vm.h>
@@ -41,7 +42,7 @@
 struct vnode;
 
 struct region {
-	vaddr_t vbase;
+	vaddr_t vbase; //where the region starts in virtual memory.
 	size_t npages;
 	int readable;
 	int writeable;
@@ -75,16 +76,18 @@ struct addrspace {
 #endif
 };
 
-struct page{
+struct page_entry{
         paddr_t frame_address;
         vaddr_t page_address;
         struct addrspace *pid;
-        struct page *next_page; 
+        struct page_entry *next_page; 
 }
 
-void create_page_table(void);
+void create_pagetable(void);
 int insert_page(vaddr_t page_address);
-int lookup_page_table(vaddr_t lookup_address,struct addrspace *pid);
+int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid);
+int lookup_region(vaddr_t lookup_address, struct addrspace *as);
+uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr);
 
 /*
  * Functions in addrspace.c:

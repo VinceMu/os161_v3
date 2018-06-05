@@ -6,27 +6,160 @@
 #include <vm.h>
 #include <machine/tlb.h>
 
-struct page *page_table = NULL; //swap to 0 if needed!
+struct page_entry *pagetable = NULL; //swap to 0 if needed!
 int num_pages = 0;
 /* Place your page table functions here */
+
+int create_pagetable(void){
+        num_pages = (ram_getsize()/PAGE_SIZE) * 2;
+        int pagetable_size = 1 + num_pages * sizeof(struct page_entry)/PAGE_SIZE;
+
+        struct spinlock creation_lock = SPINLOCK_INITIALISER;
+        spinlock_acquire(&creation_lock);
+        pagetable = (struct page_entry *)PADDR_TO_KVADDR(ram_stealmem(pagetable_size));
+        spinlock_release(&creation_lock);
+        if(pagetable == 0){
+                return ENOMEM;
+        }
+        for(int i=0;i<num_pages;i++){
+                pagetable[i].frame_address = 0;
+                pagetable[i].page_address = 0;
+                pagetable[i].pid = NULL; //might have to be 0'ed
+                pagetable[i].next_page = NULL; //might have to be  0'ed 
+        }
+        return 0;
+}
+
+int insert_page(struct addrspace* as,vaddr_t page_address){
+        //int current_page_index = page_address / (num_pages/2);
+        int current_page_index = hpt_hash(as, page_address)
+        int free_frame_index = -1; 
+        //find the index of the last page in the (possible) collision chain.  
+        while(pagetable[current_page_index].next_page != NULL){
+                //POSSIBLE POE
+                current_page_index = pagetable[current_page_index].next_page.page_address / num_pages;
+        }
+
+        int external_index = num_pages / 2;
+        //find free empty page. 
+        while(external_index < num_pages){
+                if(pagetable[external_index].frame_address == 0){
+                        free_frame_index = external_index;
+                        break;
+                }
+                external_index ++;
+        }
+        if(external_index >= num_pages-1 || free_frame_index == -1){
+                return ENOMEM;
+        }
+        //HASH FUNCTION USED BEFORE HERE!!!
+        //linking the last page to the empty page through next. 
+        pagetable[current_page_index].next_page = pagetable[free_frame_index];
+
+        // checking if in the first half of the page table.
+        if (current_page_index < num_pages / 2){
+                free_frame_index = current_page_index;        
+        }
+
+        pagetable[free_frame_index].frame_address = alloc_kpages(1);
+        bzero((void *)pagetable[free_frame_index].frame_address,  PAGE_SIZE);
+
+        struct addrspace *curr_as;
+        curr_as = proc_getas();
+
+        pagetable[free_frame_index].next_page = 0;
+        pagetable[free_frame_index].page_address = page_address - page_address % PAGE_SIZE;
+        pagetable[free_frame_index].pid = curr_as;
+
+        uint32_t elo = KVADDR_TO_PADDR(pagetable[free_frame_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
+        uint32_t ehi = page_address & TLBHI_VPAGE;
+        tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
+        int spl = splhigh();
+        splx(spl);
+        return 0;
+}
+
+//change to bool !!! if needed.
+int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
+        // int current_page_index = lookup_address / num_pages;
+        int current_page_index = hpt_hash(pid,lookup_address);
+        while(pagetable[current_page_index].pid != pid || pagetable[current_page_index].page_address != (lookup_address - lookup_address % PAGE_SIZE)){
+                //POSSIBLE POE
+                if(pagetable[current_page_index].next_page == NULL){
+                        return -1;
+                }
+                current_page_index = pagetable[current_page_index].next_page.page_address / num_pages;
+        }
+        if( pagetable[current_page_index].frame_address== 0 || page_table[index].pid != pid){                
+                return -1;
+        }
+
+        uint32_t elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
+        uint32_t ehi = a & TLBHI_VPAGE;
+        tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
+        int spl = splhigh();
+        splx(spl);
+
+        return 0;
+}
+
+int lookup_region(vaddr_t lookup_address,struct addrspace *as){
+        //potentially comment this buttom out.
+        //chagen == to != potentially  
+        // if(as->region_head->next_region == NULL && 
+        // lookup_address >= as->region_head->vbase && 
+        // lookup_address <= as->region_head->vbase + as->region_head->npages * PAGE_SIZE){
+        //         for (int i = 0;i<as->region_head->npages;i++){
+        //                 page_table_insert(lookup_address + i * PAGE_SIZE);
+        //         }
+        //         return 0;
+        // }
+
+        // struct region *curr = as->region_head->next_region;
+        struct region *curr = as->region_head;
+
+        //loop through all regions after the first one.
+        while(curr != NULL){
+                if(lookup_address >= curr->vbase && 
+                lookup_address <= curr->vbase + curr->npages * PAGE_SIZE ){
+                        for (int i = 0; i< curr->npages; i++ )
+                                page_table_insert(lookup_address + i * PAGE_SIZE);
+                        return 0;
+                }
+                curr = curr->next_region;
+        }
+        return -1;
+}
 
 void vm_bootstrap(void)
 {
         /* Initialise VM sub-system.  You probably want to initialise your 
            frame table here as well.
         */
+        create_pagetable();
         init_frametable();
 }
 
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-        (void) faulttype;
-        (void) faultaddress;
+        if(faulttype == VM_FAULT_READONLY){
+                panic("VM_FAULT_READONLY encountered!!!\n");
+                return EFAULT;
+        }
 
-        panic("vm_fault hasn't been written yet\n");
+        struct addrspace *as = NULL;
+        as = proc_getas();
+        struct addrspace pid = as->pid;
+        int err = lookup_pagetable(faultaddress, pid);
 
-        return EFAULT;
+        if(err == -1){
+                err = lookup_region(faultaddress, pid);
+                if(err == -1){
+                        return EFAULT;
+                }
+        }
+        return 0;
 }
 
 /*
@@ -41,3 +174,8 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
         panic("vm tried to do tlb shootdown?!\n");
 }
 
+uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr){
+        uint32_t index;
+        index = (((uint32_t )as) ^ (faultaddr >> PAGE_BITS)) % hpt_size;
+        return index;
+}

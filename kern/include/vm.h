@@ -32,7 +32,7 @@
 
 /*
  * VM system-related definitions.
- *
+ * 
  * You'll probably want to add stuff here.
  */
 
