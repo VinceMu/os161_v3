@@ -12,7 +12,7 @@
 
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 struct frame_table_entry {
-        struct addrspace* a_space;
+//        struct addrspace* a_space;
         paddr_t physical_addr;
         //vaddr_t virtual_addr;
         // size_t next_empty;
@@ -23,19 +23,21 @@ struct frame_table_entry *frametable = NULL; //change to 0?
 paddr_t curr_free_addr;
 //paddr_t first_addr;
 int total_frames;
+void init_frametable(void);
+paddr_t getppages(unsigned int npages);
 
 void init_frametable(void)
 {
         // might have to use lock!!!
         paddr_t ram_first = 0;
         paddr_t ram_size = ram_getsize();
-        paddr_t temp;
+       // paddr_t temp;
         total_frames = (ram_size - ram_first)/PAGE_SIZE;
         int frametable_size = total_frames * sizeof(struct frame_table_entry); 
        // int entry_num = frametable_size/PAGE_SIZE;
         frametable = (struct frame_table_entry*) PADDR_TO_KVADDR(ram_first);
         curr_free_addr = ram_first + frametable_size;
-        curr_free_addr = curr_free_addr + (PAGE_SIZE - (curr_free_addr % PAGE_SIZE))
+        curr_free_addr = curr_free_addr + (PAGE_SIZE - (curr_free_addr % PAGE_SIZE));
         //first_addr = ram_first;
 
         //UNFINISHED
@@ -70,10 +72,11 @@ paddr_t getppages(unsigned int npages){
                         return 0;
                 }
                 // maybe acquire a locker here !
-                int free_index = -1;
-                for(int i=0;i<total_frames;i++){
-                        free_index = i;
-                        if(frametable[i].is_free == False){
+         //       int free_index = -1;
+                int i = 0;
+                for(i=0;i<total_frames;i++){
+//                        free_index = i;
+                        if(frametable[i].is_free == false){
                                 break;
                         }
                 }

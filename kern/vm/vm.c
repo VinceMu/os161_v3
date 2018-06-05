@@ -5,16 +5,19 @@
 #include <addrspace.h>
 #include <vm.h>
 #include <machine/tlb.h>
+#include <spl.h>
+#include <proc.h>
 
 struct page_entry *pagetable = NULL; //swap to 0 if needed!
 int num_pages = 0;
 /* Place your page table functions here */
 
+
 int create_pagetable(void){
         num_pages = (ram_getsize()/PAGE_SIZE) * 2;
         int pagetable_size = 1 + num_pages * sizeof(struct page_entry)/PAGE_SIZE;
 
-        struct spinlock creation_lock = SPINLOCK_INITIALISER;
+        struct spinlock creation_lock = SPINLOCK_INITIALIZER;
         spinlock_acquire(&creation_lock);
         pagetable = (struct page_entry *)PADDR_TO_KVADDR(ram_stealmem(pagetable_size));
         spinlock_release(&creation_lock);
@@ -32,12 +35,12 @@ int create_pagetable(void){
 
 int insert_page(struct addrspace* as,vaddr_t page_address){
         //int current_page_index = page_address / (num_pages/2);
-        int current_page_index = hpt_hash(as, page_address)
+        int current_page_index = hpt_hash(as, page_address);
         int free_frame_index = -1; 
         //find the index of the last page in the (possible) collision chain.  
         while(pagetable[current_page_index].next_page != NULL){
                 //POSSIBLE POE
-                current_page_index = pagetable[current_page_index].next_page.page_address / num_pages;
+                current_page_index = pagetable[current_page_index].next_page->page_address / num_pages;
         }
 
         int external_index = num_pages / 2;
@@ -54,7 +57,7 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
         }
         //HASH FUNCTION USED BEFORE HERE!!!
         //linking the last page to the empty page through next. 
-        pagetable[current_page_index].next_page = pagetable[free_frame_index];
+        pagetable[current_page_index].next_page = &pagetable[free_frame_index];
 
         // checking if in the first half of the page table.
         if (current_page_index < num_pages / 2){
@@ -88,14 +91,14 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
                 if(pagetable[current_page_index].next_page == NULL){
                         return -1;
                 }
-                current_page_index = pagetable[current_page_index].next_page.page_address / num_pages;
+                current_page_index = pagetable[current_page_index].next_page->page_address / num_pages;
         }
-        if( pagetable[current_page_index].frame_address== 0 || page_table[index].pid != pid){                
+        if( pagetable[current_page_index].frame_address== 0 || pagetable[current_page_index].pid != pid){                
                 return -1;
         }
 
         uint32_t elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
-        uint32_t ehi = a & TLBHI_VPAGE;
+        uint32_t ehi = lookup_address & TLBHI_VPAGE;
         tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
         int spl = splhigh();
         splx(spl);
@@ -122,8 +125,8 @@ int lookup_region(vaddr_t lookup_address,struct addrspace *as){
         while(curr != NULL){
                 if(lookup_address >= curr->vbase && 
                 lookup_address <= curr->vbase + curr->npages * PAGE_SIZE ){
-                        for (int i = 0; i< curr->npages; i++ )
-                                page_table_insert(lookup_address + i * PAGE_SIZE);
+                        for (unsigned int i = 0; i< curr->npages; i++ )
+                                insert_page(as,lookup_address + i * PAGE_SIZE);
                         return 0;
                 }
                 curr = curr->next_region;
@@ -150,7 +153,8 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
         struct addrspace *as = NULL;
         as = proc_getas();
-        struct addrspace pid = as->pid;
+        struct addrspace *pid = NULL;
+	pid = as->pid;
         int err = lookup_pagetable(faultaddress, pid);
 
         if(err == -1){
@@ -176,6 +180,6 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 
 uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr){
         uint32_t index;
-        index = (((uint32_t )as) ^ (faultaddr >> PAGE_BITS)) % hpt_size;
+        index = (((uint32_t )as) ^ (faultaddr >> PAGE_BITS)) % num_pages ;
         return index;
 }

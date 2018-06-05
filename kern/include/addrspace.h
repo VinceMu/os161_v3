@@ -81,10 +81,10 @@ struct page_entry{
         vaddr_t page_address;
         struct addrspace *pid;
         struct page_entry *next_page; 
-}
-
-void create_pagetable(void);
-int insert_page(vaddr_t page_address);
+};
+void flush_tlb(void);
+int create_pagetable(void);
+int insert_page(struct addrspace* as,vaddr_t page_address);
 int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid);
 int lookup_region(vaddr_t lookup_address, struct addrspace *as);
 uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr);

@@ -66,14 +66,14 @@ as_create(void)
         as->n_regions = 0;
         as->region_head = NULL;
         as->pid  = NULL; //maybe as
-        as->as_stackpbase = NULL;
+        as->as_stackpbase = 0;
         return as;
 }
 
 int
 as_copy(struct addrspace *old, struct addrspace **ret)
 {
-        struct addrspace newas;
+        struct addrspace *newas;
         newas = as_create();
 
         if (newas==NULL) {
@@ -93,8 +93,8 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                 new_region = new_region->next_region;
 
                 memmove((void *)new_region->vbase,
-                        (void )old_region->vbase,
-                        PAGE_SIZEold_region->npages);
+                        (void *)old_region->vbase,
+                        PAGE_SIZE*old_region->npages);
         }
 
 
@@ -105,7 +105,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 void
 as_destroy(struct addrspace *as)
 {
-        struct as_region * curr, * next;
+        struct region * curr, * next;
         if(as->region_head != 0){
                 panic("no regions to free!\n");
                 return;
