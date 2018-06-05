@@ -47,7 +47,13 @@
  * part of the VM subsystem.
  *
  */
-
+void flush_tlb(void){
+        int spl = splhigh();
+        for (int i = 0; i < NUM_TLB; i++) {
+                tlb_write(TLBHI_INVALID(i), TLBLO_INVALID(), i);
+        }
+        splx(spl);
+}
 struct addrspace *
 as_create(void)
 {
@@ -57,29 +63,40 @@ as_create(void)
         if (as == NULL) {
                 return NULL;
         }
-
-        /*
-         * Initialize as needed.
-         */
-
+        as->n_regions = 0;
+        as->region_head = NULL;
+        as->pid  = NULL; //maybe as
+        as->as_stackpbase = NULL;
         return as;
 }
 
 int
 as_copy(struct addrspace *old, struct addrspace **ret)
 {
-        struct addrspace *newas;
-
+        struct addrspace newas;
         newas = as_create();
+
         if (newas==NULL) {
                 return ENOMEM;
         }
+        struct region* old_region = old->region_head;
+        struct region* new_region = newas->region_head;
 
-        /*
-         * Write this.
-         */
+        while(old_region != NULL){
+                as_define_region(newas, 
+                                old_region->vbase, 
+                                old_region->npages * PAGE_SIZE,
+                                old_region->readable,
+                                old_region->writeable,
+                                old_region->executable);
+                old_region = old_region->next_region;
+                new_region = new_region->next_region;
 
-        (void)old;
+                memmove((void *)new_region->vbase,
+                        (void )old_region->vbase,
+                        PAGE_SIZEold_region->npages);
+        }
+
 
         *ret = newas;
         return 0;
@@ -88,10 +105,17 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 void
 as_destroy(struct addrspace *as)
 {
-        /*
-         * Clean up as needed.
-         */
-
+        struct as_region * curr, * next;
+        if(as->region_head != 0){
+                panic("no regions to free!\n");
+                return;
+        }
+        curr = as->region_head;
+        while(curr != NULL) {
+                next = curr->next_region;
+                kfree(curr);
+                curr = next;
+        }
         kfree(as);
 }
 
@@ -108,20 +132,14 @@ as_activate(void)
                  */
                 return;
         }
-
-        /*
-         * Write this.
-         */
+        flush_tlb();
+       
 }
 
 void
 as_deactivate(void)
 {
-        /*
-         * Write this. For many designs it won't need to actually do
-         * anything. See proc.c for an explanation of why it (might)
-         * be needed.
-         */
+        flush_tlb();
 }
 
 /*
@@ -141,34 +159,55 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
         /*
          * Write this.
          */
+         if(as == NULL){
+                 panic("as not initialised!\n");
+                 return EINVAL;
+        }
+        struct region* new_region = (struct region*) kmalloc(sizeof(struct region));
+        if(new_region == NULL){
+                panic("not enough memory to malloc new region!\n");
+                return ENOMEM;
+        }
 
-        (void)as;
-        (void)vaddr;
-        (void)memsize;
-        (void)readable;
-        (void)writeable;
-        (void)executable;
-        return ENOSYS; /* Unimplemented */
+        new_region->vbase = vaddr - vaddr % PAGE_SIZE;
+        new_region->npages = (memsize + vaddr % PAGE_SIZE + PAGE_SIZE - 1 ) / PAGE_SIZE ;
+        new_region->readable = readable;
+        new_region->executable = executable;
+        new_region->writeable = writeable;
+        new_region->next_region = NULL;
+
+        if(as->region_head == NULL){
+                as->region_head = new_region;
+                as->n_regions++;
+        }
+        else{
+                struct region* tmp = as->region_head;
+                // may need a previous if inserting in the middle. 
+                while(tmp->next_region != NULL){
+                        tmp = tmp->next_region;
+                }
+
+                tmp->next_region = new_region;
+                as->n_regions++;
+        }
+        return 0;
 }
 
 int
 as_prepare_load(struct addrspace *as)
 {
-        /*
-         * Write this.
-         */
-
-        (void)as;
+        struct region *tmp = as->region_head;
+        while(tmp->next_region != NULL){
+                tmp->writeable = 1;
+                bzero((void *)tmp->vbase, tmp->npages * PAGE_SIZE);
+                tmp = tmp->next_region;
+        }
         return 0;
 }
 
 int
 as_complete_load(struct addrspace *as)
 {
-        /*
-         * Write this.
-         */
-
         (void)as;
         return 0;
 }
@@ -176,12 +215,7 @@ as_complete_load(struct addrspace *as)
 int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
-        /*
-         * Write this.
-         */
-
-        (void)as;
-
+        as_define_region(as, USERSTACK - 16 * PAGE_SIZE , 16 * PAGE_SIZE, 1, 1, 1);
         /* Initial user-level stack pointer */
         *stackptr = USERSTACK;
 
