@@ -333,7 +333,7 @@ loadexec(char *path, vaddr_t *entrypoint, vaddr_t *stackptr)
 	struct vnode *v;
 	char *newname;
 	int result;
-
+	//kprintf("in load exec\n"); // remove later
 	/* new name for thread */
 	newname = kstrdup(path);
 	if (newname == NULL) {
@@ -349,6 +349,7 @@ loadexec(char *path, vaddr_t *entrypoint, vaddr_t *stackptr)
 
 	/* make a new address space. */
 	newvm = as_create();
+	//kprintf("passed as_create\n"); //delete later
 	if (newvm == NULL) {
 		vfs_close(v);
 		kfree(newname);
@@ -358,13 +359,16 @@ loadexec(char *path, vaddr_t *entrypoint, vaddr_t *stackptr)
 	/* replace address spaces, and activate the new one */
 	oldvm = proc_setas(newvm);
 	as_activate();
+	//kprintf("passed as activate()\n"); //delete later
 
  	/*
 	 * Load the executable. If it fails, restore the old address
 	 * space and (re-)activate it.
 	 */
 	result = load_elf(v, entrypoint);
+	//kprintf("passed load_elf\n");
 	if (result) {
+	//	kprintf("executable could not load\n"); //delete later
 		vfs_close(v);
 		proc_setas(oldvm);
 		as_activate();
@@ -374,9 +378,11 @@ loadexec(char *path, vaddr_t *entrypoint, vaddr_t *stackptr)
 	}
 
 	vfs_close(v);
+	//kprintf("about to define the stack\n");//delete later
 
 	/* Define the user stack in the address space */
 	result = as_define_stack(newvm, stackptr);
+	//kprintf("defined the stack\n"); //delete later
 	if (result) {
 		proc_setas(oldvm);
 		as_activate();
@@ -384,7 +390,7 @@ loadexec(char *path, vaddr_t *entrypoint, vaddr_t *stackptr)
 		kfree(newname);
 		return result;
         }
-
+	
 	/*
 	 * Wipe out old address space.
 	 *
@@ -401,7 +407,7 @@ loadexec(char *path, vaddr_t *entrypoint, vaddr_t *stackptr)
 	 */
 	kfree(curthread->t_name);
 	curthread->t_name = newname;
-
+	//kprintf("finished load exe\n");
 	return 0;
 }
 

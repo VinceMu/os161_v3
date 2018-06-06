@@ -242,18 +242,21 @@ load_elf(struct vnode *v, vaddr_t *entrypoint)
 				ph.p_type);
 			return ENOEXEC;
 		}
-
+		kprintf("before define region\n"); //delete later
 		result = as_define_region(as,
 					  ph.p_vaddr, ph.p_memsz,
 					  ph.p_flags & PF_R,
 					  ph.p_flags & PF_W,
 					  ph.p_flags & PF_X);
+		kprintf("after define region\n");//delete later
 		if (result) {
+			kprintf("got a bad result from as define region\n");//delete later
 			return result;
 		}
 	}
 
 	result = as_prepare_load(as);
+	kprintf("after prepare load\n");//delete later
 	if (result) {
 		return result;
 	}
@@ -297,6 +300,7 @@ load_elf(struct vnode *v, vaddr_t *entrypoint)
 	}
 
 	result = as_complete_load(as);
+	kprintf("after complete load\n");//delete later
 	if (result) {
 		return result;
 	}

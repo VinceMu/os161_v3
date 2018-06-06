@@ -73,6 +73,8 @@ as_create(void)
 int
 as_copy(struct addrspace *old, struct addrspace **ret)
 {
+	
+	//panic("as copy\n");
         struct addrspace *newas;
         newas = as_create();
 
@@ -190,6 +192,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
                 tmp->next_region = new_region;
                 as->n_regions++;
         }
+	// panic("finished creating region\n"); passed!
         return 0;
 }
 
@@ -215,9 +218,11 @@ as_complete_load(struct addrspace *as)
 int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
+	//panic("defining stack\n");
         as_define_region(as, USERSTACK - 16 * PAGE_SIZE , 16 * PAGE_SIZE, 1, 1, 1);
         /* Initial user-level stack pointer */
-        *stackptr = USERSTACK;
+//	panic("finished defining stack region"); does not reach here! 
+       *stackptr = USERSTACK;
 
         return 0;
 }
