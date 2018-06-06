@@ -181,6 +181,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
         if(as->region_head == NULL){
                 as->region_head = new_region;
                 as->n_regions++;
+		return 0;
         }
         else{
                 struct region* tmp = as->region_head;
