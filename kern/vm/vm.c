@@ -14,13 +14,16 @@ int num_pages = 0;
 
 
 int create_pagetable(void){
-        num_pages = (ram_getsize()/PAGE_SIZE) * 2;
+	struct spinlock creation_lock = SPINLOCK_INITIALIZER;
+        spinlock_acquire(&creation_lock);
+
+     	 num_pages = (ram_getsize()/PAGE_SIZE) * 2;
         int pagetable_size = 1 + num_pages * sizeof(struct page_entry)/PAGE_SIZE;
 
-        struct spinlock creation_lock = SPINLOCK_INITIALIZER;
-        spinlock_acquire(&creation_lock);
+        //struct spinlock creation_lock = SPINLOCK_INITIALIZER;
+        //spinlock_acquire(&creation_lock);
         pagetable = (struct page_entry *)PADDR_TO_KVADDR(ram_stealmem(pagetable_size));
-        spinlock_release(&creation_lock);
+        //spinlock_release(&creation_lock);
         if(pagetable == 0){
                 return ENOMEM;
         }
@@ -31,20 +34,21 @@ int create_pagetable(void){
                 pagetable[i].next_page = NULL; //might have to be  0'ed 
         }
         kprintf("initialised pagetable \n");
-        return 0;
+        spinlock_release(&creation_lock);
+	return 0;
 }
 
 int insert_page(struct addrspace* as,vaddr_t page_address){
         //int current_page_index = page_address / (num_pages/2);
         int current_page_index = hpt_hash(as, page_address);
         int free_frame_index = -1; 
-	kprintf("started insert_page\n");
+	//kprintf("started insert_page\n");
         //find the index of the last page in the (possible) collision chain.  
         while(pagetable[current_page_index].next_page != NULL){
                 //POSSIBLE POE
                 current_page_index = pagetable[current_page_index].next_page->page_address / num_pages;
         }
-        kprintf("finished finding current_page_index \n");
+        //kprintf("finished finding current_page_index \n");
 
         int external_index = num_pages / 2;
         //find free empty page. 
@@ -55,7 +59,7 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
                 }
                 external_index ++;
         }
-        kprintf("found external index\n");
+        //kprintf("found external index\n");
         if(external_index >= num_pages-1 || free_frame_index == -1){
                 return ENOMEM;
         }
@@ -83,23 +87,24 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
         tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
         int spl = splhigh();
         splx(spl);
-        kprintf("finished insert_page\n");
+        //kprintf("finished insert_page\n");
         return 0;
 }
 
 //change to bool !!! if needed.
 int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         // int current_page_index = lookup_address / num_pages;
-        kprintf("started lookup_pagetable\n");
+        //kprintf("started lookup_pagetable\n");
         int current_page_index = hpt_hash(pid,lookup_address);
         while(pagetable[current_page_index].pid != pid || pagetable[current_page_index].page_address != (lookup_address - lookup_address % PAGE_SIZE)){
                 //POSSIBLE POE
                 if(pagetable[current_page_index].next_page == NULL){
-                        return -1;
+                        //panic("no next page\n"); ENTERS THIS FOR FAULTER - GOOD
+			return -1;
                 }
                 current_page_index = pagetable[current_page_index].next_page->page_address / num_pages;
         }
-        kprintf("found current page index in lookup\n");
+        //kprintf("found current page index in lookup\n");
         if( pagetable[current_page_index].frame_address== 0 || pagetable[current_page_index].pid != pid){                
                 return -1;
         }
@@ -109,7 +114,7 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
         int spl = splhigh();
         splx(spl);
-        kprintf("finished lookup page table\n");
+        //kprintf("finished lookup page table\n");
         return 0;
 }
 
@@ -127,17 +132,26 @@ int lookup_region(vaddr_t lookup_address,struct addrspace *as){
 
         // struct region *curr = as->region_head->next_region;
         struct region *curr = as->region_head;
-        kprintf("started lookup region\n");
+	
+	//panic("looking up region for %d\n",lookup_address);
+        //kprintf("started lookup region\n");
         //loop through all regions after the first one.
         while(curr != NULL){
+		panic("just entered while\n");
                 if(lookup_address >= curr->vbase && 
                 lookup_address <= curr->vbase + curr->npages * PAGE_SIZE ){
-                        for (unsigned int i = 0; i< curr->npages; i++ )
+                        for (unsigned int i = 0; i< curr->npages; i++ ){
+			//	panic("inserting page\n"); //does not even reach here for faulter!!!
                                 insert_page(as,lookup_address + i * PAGE_SIZE);
+			}
+			panic("found address %d\n",lookup_address);
                         return 0;
                 }
+		panic("about to get the next region\n");
                 curr = curr->next_region;
+
         }
+	panic("address not found in any region %d\n",lookup_address);
         return -1;
 }
 
@@ -147,15 +161,15 @@ void vm_bootstrap(void)
            frame table here as well.
         */
         create_pagetable();
-        kprintf("finished  creating page table!!!\n");
+//        kprintf("finished  creating page table!!!\n");
         init_frametable();
-        kprintf("finished bootstrapping vm!\n");
+ //       kprintf("finished bootstrapping vm!\n");
 }
 
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-        kprintf("in vm_fault\n");
+  //      kprintf("in vm_fault\n");
         if(faulttype == VM_FAULT_READONLY){
                 panic("VM_FAULT_READONLY encountered!!!\n");
                 return EFAULT;
@@ -170,10 +184,11 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         if(err == -1){
                 err = lookup_region(faultaddress, pid);
                 if(err == -1){
+			panic("EFAULT\n");
                         return EFAULT;
                 }
         }
-        kprintf("finished vm_fault\n");
+//        kprintf("finished vm_fault\n");
         return 0;
 }
 
