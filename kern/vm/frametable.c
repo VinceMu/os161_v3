@@ -4,7 +4,7 @@
 #include <thread.h>
 #include <addrspace.h>
 #include <vm.h>
-
+#include <synch.h>
 /* Place your frametable data-structures here 
  * You probably also want to write a frametable initialisation
  * function and call it from vm_bootstrap
@@ -21,6 +21,8 @@ struct frame_table_entry {
 };
 struct frame_table_entry *frametable = NULL; //change to 0?
 paddr_t curr_free_addr;
+struct lock* frametable_lock;
+
 //paddr_t first_addr;
 int total_frames;
 void init_frametable(void);
@@ -28,8 +30,10 @@ paddr_t getppages(unsigned int npages);
 
 void init_frametable(void)
 {
+        frametable_lock = lock_create("frametable lock");
         // might have to use lock!!!
         paddr_t ram_first = 0;
+        
         paddr_t ram_size = ram_getsize();
        // paddr_t temp;
         total_frames = (ram_size - ram_first)/PAGE_SIZE;
@@ -72,7 +76,7 @@ paddr_t getppages(unsigned int npages){
                         return 0;
                 }
                 // maybe acquire a locker here !
-         //       int free_index = -1;
+		lock_acquire(frametable_lock);
                 int i = 0;
                 for(i=0;i<total_frames;i++){
 //                        free_index = i;
@@ -80,8 +84,15 @@ paddr_t getppages(unsigned int npages){
                                 break;
                         }
                 }
-                frametable[i].is_free = false;
-                nextaddr = frametable[i].physical_addr;
+                if( i < total_frames){
+
+                	frametable[i].is_free = false;
+                  	nextaddr = frametable[i].physical_addr;
+			lock_release(frametable_lock);
+                }else{
+		     lock_release(frametable_lock);
+                     return 0;
+                }
                 // CHECK IF i > total_frames !?!?!
         }
         bzero((void *)PADDR_TO_KVADDR(nextaddr),PAGE_SIZE);

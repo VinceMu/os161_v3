@@ -30,6 +30,7 @@ int create_pagetable(void){
                 pagetable[i].pid = NULL; //might have to be 0'ed
                 pagetable[i].next_page = NULL; //might have to be  0'ed 
         }
+        kprintf("initialised pagetable \n");
         return 0;
 }
 
@@ -37,11 +38,13 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
         //int current_page_index = page_address / (num_pages/2);
         int current_page_index = hpt_hash(as, page_address);
         int free_frame_index = -1; 
+	kprintf("started insert_page\n");
         //find the index of the last page in the (possible) collision chain.  
         while(pagetable[current_page_index].next_page != NULL){
                 //POSSIBLE POE
                 current_page_index = pagetable[current_page_index].next_page->page_address / num_pages;
         }
+        kprintf("finished finding current_page_index \n");
 
         int external_index = num_pages / 2;
         //find free empty page. 
@@ -52,6 +55,7 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
                 }
                 external_index ++;
         }
+        kprintf("found external index\n");
         if(external_index >= num_pages-1 || free_frame_index == -1){
                 return ENOMEM;
         }
@@ -79,12 +83,14 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
         tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
         int spl = splhigh();
         splx(spl);
+        kprintf("finished insert_page\n");
         return 0;
 }
 
 //change to bool !!! if needed.
 int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         // int current_page_index = lookup_address / num_pages;
+        kprintf("started lookup_pagetable\n");
         int current_page_index = hpt_hash(pid,lookup_address);
         while(pagetable[current_page_index].pid != pid || pagetable[current_page_index].page_address != (lookup_address - lookup_address % PAGE_SIZE)){
                 //POSSIBLE POE
@@ -93,6 +99,7 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
                 }
                 current_page_index = pagetable[current_page_index].next_page->page_address / num_pages;
         }
+        kprintf("found current page index in lookup\n");
         if( pagetable[current_page_index].frame_address== 0 || pagetable[current_page_index].pid != pid){                
                 return -1;
         }
@@ -102,7 +109,7 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
         int spl = splhigh();
         splx(spl);
-
+        kprintf("finished lookup page table\n");
         return 0;
 }
 
@@ -120,7 +127,7 @@ int lookup_region(vaddr_t lookup_address,struct addrspace *as){
 
         // struct region *curr = as->region_head->next_region;
         struct region *curr = as->region_head;
-
+        kprintf("started lookup region\n");
         //loop through all regions after the first one.
         while(curr != NULL){
                 if(lookup_address >= curr->vbase && 
@@ -140,12 +147,15 @@ void vm_bootstrap(void)
            frame table here as well.
         */
         create_pagetable();
+        kprintf("finished  creating page table!!!\n");
         init_frametable();
+        kprintf("finished bootstrapping vm!\n");
 }
 
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
+        kprintf("in vm_fault\n");
         if(faulttype == VM_FAULT_READONLY){
                 panic("VM_FAULT_READONLY encountered!!!\n");
                 return EFAULT;
@@ -163,6 +173,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                         return EFAULT;
                 }
         }
+        kprintf("finished vm_fault\n");
         return 0;
 }
 
@@ -183,3 +194,4 @@ uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr){
         index = (((uint32_t )as) ^ (faultaddr >> PAGE_BITS)) % num_pages ;
         return index;
 }
+
