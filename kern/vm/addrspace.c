@@ -65,7 +65,7 @@ as_create(void)
         }
         as->n_regions = 0;
         as->region_head = NULL;
-        as->pid  = NULL; //maybe as
+        as->pid  = as; //maybe as
         as->as_stackpbase = 0;
         return as;
 }

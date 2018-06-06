@@ -137,18 +137,22 @@ int lookup_region(vaddr_t lookup_address,struct addrspace *as){
         //kprintf("started lookup region\n");
         //loop through all regions after the first one.
         while(curr != NULL){
-		panic("just entered while\n");
+	//	panic("just entered while\n");
                 if(lookup_address >= curr->vbase && 
                 lookup_address <= curr->vbase + curr->npages * PAGE_SIZE ){
-                        for (unsigned int i = 0; i< curr->npages; i++ ){
+                        for (unsigned int i = 0; i< as->region_head->npages; i++ ){
 			//	panic("inserting page\n"); //does not even reach here for faulter!!!
+				kprintf("for loop\n");
                                 insert_page(as,lookup_address + i * PAGE_SIZE);
 			}
-			panic("found address %d\n",lookup_address);
+//			panic("found address %d\n",lookup_address);
                         return 0;
                 }
-		panic("about to get the next region\n");
+//		panic("about to get the next region\n");
+		kprintf("error spot?\n");
                 curr = curr->next_region;
+		
+		
 
         }
 	panic("address not found in any region %d\n",lookup_address);
