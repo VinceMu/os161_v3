@@ -83,7 +83,7 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
         pagetable[free_frame_index].pid = curr_as;
 	       uint32_t elo,ehi;
         int spl = splhigh();
-        int i;
+        /*int i;
         for (i=0; i<NUM_TLB; i++) {
                 tlb_read(&ehi, &elo, i);
                 if (elo & TLBLO_VALID) {
@@ -95,7 +95,7 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
         tlb_write(ehi, elo, i);
         splx(spl);
         return 0;
-        }
+        }*/
 
 	//int spl = splhigh();
         elo = KVADDR_TO_PADDR(pagetable[free_frame_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
@@ -126,7 +126,7 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         }	
 	uint32_t elo,ehi;
         int spl = splhigh();
-	int i;
+	/*int i;
 	for (i=0; i<NUM_TLB; i++) {
         	tlb_read(&ehi, &elo, i);
         	if (elo & TLBLO_VALID) {
@@ -138,7 +138,7 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         tlb_write(ehi, elo, i);
         splx(spl);
         return 0;
-	}
+	}*/
 
         elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
         ehi = lookup_address & TLBHI_VPAGE;
