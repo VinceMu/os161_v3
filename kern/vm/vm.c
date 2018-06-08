@@ -22,7 +22,8 @@ int create_pagetable(void){
         //struct spinlock creation_lock = SPINLOCK_INITIALIZER;
         //spinlock_acquire(&creation_lock);
         pagetable = (struct page_entry *)PADDR_TO_KVADDR(ram_stealmem(pagetable_size));
-        //spinlock_release(&creation_lock);
+        //pagetable = (struct page_entry *)kmalloc(pagetable_size);
+	//spinlock_release(&creation_lock);
         if(pagetable == 0){
                 return ENOMEM;
         }
@@ -83,19 +84,6 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
         pagetable[free_frame_index].pid = curr_as;
 	       uint32_t elo,ehi;
         int spl = splhigh();
-        /*int i;
-        for (i=0; i<NUM_TLB; i++) {
-                tlb_read(&ehi, &elo, i);
-                if (elo & TLBLO_VALID) {
-                        continue;
-                }
-        ehi = page_address;
-        elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address) | TLBLO_DIRTY | TLBLO_VALID;
-        //DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
-        tlb_write(ehi, elo, i);
-        splx(spl);
-        return 0;
-        }*/
 
 	//int spl = splhigh();
         elo = KVADDR_TO_PADDR(pagetable[free_frame_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
@@ -127,19 +115,7 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         }	
 	uint32_t elo,ehi;
         int spl = splhigh();
-	/*int i;
-	for (i=0; i<NUM_TLB; i++) {
-        	tlb_read(&ehi, &elo, i);
-        	if (elo & TLBLO_VALID) {
-            		continue;
-       	 	}
-       	ehi = lookup_address;
-        elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address) | TLBLO_DIRTY | TLBLO_VALID;
-        //DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
-        tlb_write(ehi, elo, i);
-        splx(spl);
-        return 0;
-	}*/	
+	
         elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
         ehi = lookup_address & TLBHI_VPAGE;
         tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
@@ -151,18 +127,6 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
 }
 
 int lookup_region(vaddr_t lookup_address,struct addrspace *as){
-        //potentially comment this buttom out.
-        //chagen == to != potentially  
-        // if(as->region_head->next_region == NULL && 
-        // lookup_address >= as->region_head->vbase && 
-        // lookup_address <= as->region_head->vbase + as->region_head->npages * PAGE_SIZE){
-        //         for (int i = 0;i<as->region_head->npages;i++){
-        //                 page_table_insert(lookup_address + i * PAGE_SIZE);
-        //         }
-        //         return 0;
-        // }
-
-        // struct region *curr = as->region_head->next_region;
         struct region *curr = as->region_head;
 	
 	//panic("looking up region for %d\n",lookup_address);
@@ -194,21 +158,14 @@ int lookup_region(vaddr_t lookup_address,struct addrspace *as){
 
 void vm_bootstrap(void)
 {
-        /* Initialise VM sub-system.  You probably want to initialise your 
-           frame table here as well.
-        */
-        create_pagetable();
-//        kprintf("finished  creating page table!!!\n");
-        init_frametable();
- //       kprintf("finished bootstrapping vm!\n");
+	create_pagetable();
+	init_frametable();
 }
 
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-  //      kprintf("in vm_fault\n");
         if(faulttype == VM_FAULT_READONLY){
-  //              panic("VM_FAULT_READONLY encountered!!!\n");
                 return EFAULT;
         }
 
@@ -224,11 +181,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         if(err == -1){
                 err = lookup_region(faultaddress, pid);
                 if(err == -1){
-//			panic("EFAULT\n");
                         return EFAULT;
                 }
         }
-//        kprintf("finished vm_fault\n");
         return 0;
 }
 
