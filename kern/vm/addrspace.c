@@ -109,7 +109,7 @@ as_destroy(struct addrspace *as)
 {
         struct region * curr, * next;
         if(as->region_head != 0){
-                panic("no regions to free!\n");
+//                panic("no regions to free!\n");
                 return;
         }
         curr = as->region_head;
