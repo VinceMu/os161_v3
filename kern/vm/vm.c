@@ -142,20 +142,20 @@ int lookup_region(vaddr_t lookup_address,struct addrspace *as){
                 lookup_address <= curr->vbase + curr->npages * PAGE_SIZE ){
                         for (unsigned int i = 0; i< as->region_head->npages; i++ ){
 			//	panic("inserting page\n"); //does not even reach here for faulter!!!
-				kprintf("for loop\n");
+//				kprintf("for loop\n");
                                 insert_page(as,lookup_address + i * PAGE_SIZE);
 			}
 //			panic("found address %d\n",lookup_address);
                         return 0;
                 }
 //		panic("about to get the next region\n");
-		kprintf("error spot?\n");
+//		kprintf("error spot?\n");
                 curr = curr->next_region;
 		
 		
 
         }
-	panic("address not found in any region %d\n",lookup_address);
+//	panic("address not found in any region %d\n",lookup_address);
         return -1;
 }
 
@@ -175,7 +175,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 {
   //      kprintf("in vm_fault\n");
         if(faulttype == VM_FAULT_READONLY){
-                panic("VM_FAULT_READONLY encountered!!!\n");
+  //              panic("VM_FAULT_READONLY encountered!!!\n");
                 return EFAULT;
         }
 
@@ -188,7 +188,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         if(err == -1){
                 err = lookup_region(faultaddress, pid);
                 if(err == -1){
-			panic("EFAULT\n");
+//			panic("EFAULT\n");
                         return EFAULT;
                 }
         }

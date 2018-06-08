@@ -142,7 +142,7 @@ void
 as_deactivate(void)
 {
 	//as_activate();
-//        flush_tlb();
+        flush_tlb();
 }
 
 /*
