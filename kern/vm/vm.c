@@ -81,11 +81,27 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
         pagetable[free_frame_index].next_page = 0;
         pagetable[free_frame_index].page_address = page_address - page_address % PAGE_SIZE;
         pagetable[free_frame_index].pid = curr_as;
-
-        uint32_t elo = KVADDR_TO_PADDR(pagetable[free_frame_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
-        uint32_t ehi = page_address & TLBHI_VPAGE;
-        tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
+	       uint32_t elo,ehi;
         int spl = splhigh();
+        int i;
+        for (i=0; i<NUM_TLB; i++) {
+                tlb_read(&ehi, &elo, i);
+                if (elo & TLBLO_VALID) {
+                        continue;
+                }
+        ehi = page_address;
+        elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address) | TLBLO_DIRTY | TLBLO_VALID;
+        //DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
+        tlb_write(ehi, elo, i);
+        splx(spl);
+        return 0;
+        }
+
+	//int spl = splhigh();
+        elo = KVADDR_TO_PADDR(pagetable[free_frame_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
+        ehi = page_address & TLBHI_VPAGE;
+        tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
+//        int spl = splhigh();
         splx(spl);
         //kprintf("finished insert_page\n");
         return 0;
@@ -107,12 +123,27 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         //kprintf("found current page index in lookup\n");
         if( pagetable[current_page_index].frame_address== 0 || pagetable[current_page_index].pid != pid){                
                 return -1;
-        }
-
-        uint32_t elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
-        uint32_t ehi = lookup_address & TLBHI_VPAGE;
-        tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
+        }	
+	uint32_t elo,ehi;
         int spl = splhigh();
+	int i;
+	for (i=0; i<NUM_TLB; i++) {
+        	tlb_read(&ehi, &elo, i);
+        	if (elo & TLBLO_VALID) {
+            		continue;
+       	 	}
+       	ehi = lookup_address;
+        elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address) | TLBLO_DIRTY | TLBLO_VALID;
+        //DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
+        tlb_write(ehi, elo, i);
+        splx(spl);
+        return 0;
+	}
+
+        elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
+        ehi = lookup_address & TLBHI_VPAGE;
+        tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
+        //int spl = splhigh();
         splx(spl);
         //kprintf("finished lookup page table\n");
         return 0;
