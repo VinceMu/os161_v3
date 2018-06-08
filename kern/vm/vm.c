@@ -12,7 +12,6 @@ struct page_entry *pagetable = NULL; //swap to 0 if needed!
 int num_pages = 0;
 /* Place your page table functions here */
 
-
 int create_pagetable(void){
 	struct spinlock creation_lock = SPINLOCK_INITIALIZER;
         spinlock_acquire(&creation_lock);
@@ -41,6 +40,7 @@ int create_pagetable(void){
 int insert_page(struct addrspace* as,vaddr_t page_address){
         //int current_page_index = page_address / (num_pages/2);
         int current_page_index = hpt_hash(as, page_address);
+
         int free_frame_index = -1; 
 	//kprintf("started insert_page\n");
         //find the index of the last page in the (possible) collision chain.  
@@ -104,6 +104,7 @@ int insert_page(struct addrspace* as,vaddr_t page_address){
 //        int spl = splhigh();
         splx(spl);
         //kprintf("finished insert_page\n");
+
         return 0;
 }
 
@@ -138,11 +139,11 @@ int lookup_pagetable(vaddr_t lookup_address,struct addrspace *pid){
         tlb_write(ehi, elo, i);
         splx(spl);
         return 0;
-	}*/
-
+	}*/	
         elo = KVADDR_TO_PADDR(pagetable[current_page_index].frame_address)| TLBLO_DIRTY | TLBLO_VALID;
         ehi = lookup_address & TLBHI_VPAGE;
         tlb_random(ehi, elo | TLBLO_VALID | TLBLO_DIRTY);
+	
         //int spl = splhigh();
         splx(spl);
         //kprintf("finished lookup page table\n");
@@ -175,6 +176,7 @@ int lookup_region(vaddr_t lookup_address,struct addrspace *as){
 			//	panic("inserting page\n"); //does not even reach here for faulter!!!
 //				kprintf("for loop\n");
                                 insert_page(as,lookup_address + i * PAGE_SIZE);
+				break;
 			}
 //			panic("found address %d\n",lookup_address);
                         return 0;
@@ -214,6 +216,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         as = proc_getas();
         struct addrspace *pid = NULL;
 	pid = as->pid;
+	
+	if(as == NULL) return EFAULT;
+	
         int err = lookup_pagetable(faultaddress, pid);
 
         if(err == -1){
